@@ -1,0 +1,13 @@
+{
+  "string": [
+    { "name": "app_name", "value": "TimestampTool" },
+    { "name": "module_desc", "value": "时间戳快捷输入工具 - 鸿蒙PC版" },
+    { "name": "ability_desc", "value": "主界面与设置" },
+    { "name": "perm_input_reason", "value": "用于监听全局快捷键 Ctrl+Shift+Z 呼出模板菜单" },
+    { "name": "perm_float_reason", "value": "用于在其他应用上方显示模板选择浮窗" },
+    { "name": "perm_bg_reason", "value": "用于后台常驻监听全局快捷键" }
+  ],
+  "color": [
+    { "name": "start_window_background", "value": "#FFFFFF" }
+  ]
+}

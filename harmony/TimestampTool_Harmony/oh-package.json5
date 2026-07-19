@@ -1,0 +1,12 @@
+{
+  "name": "timestamp-tool-harmony",
+  "version": "1.0.0",
+  "description": "TimestampTool 鸿蒙PC版 - 时间戳快捷输入工具",
+  "main": "",
+  "author": "Sampson",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "@ohos/hypium": "1.0.18"
+  }
+}

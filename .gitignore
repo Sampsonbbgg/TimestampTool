@@ -1,0 +1,57 @@
+# ============ Python ============
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pyc
+
+# ============ 打包产物 ============
+# 每个 exe 版本归档到 releases/，dist/ 只是最新构建
+dist/
+build/
+build_temp/
+*.spec
+
+# ============ 虚拟环境 ============
+venv/
+.venv/
+env/
+ENV/
+
+# ============ IDE / 编辑器 ============
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ============ 敏感文件 ============
+# 用户本地配置和签名密钥不入库
+config/config.json
+config/config.json.bak
+*.p12
+*.jks
+*.keystore
+
+# ============ 鸿蒙工程 ============
+harmony/**/build/
+harmony/**/.hvigor/
+harmony/**/.cxx/
+harmony/**/.idea/
+harmony/**/local.properties
+harmony/**/oh_modules/
+
+# ============ 日志和临时 ============
+*.log
+*.tmp
+tmp/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ============ AI 工具缓存 ============
+.qoder/repowiki/
