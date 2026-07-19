@@ -55,5 +55,10 @@ class Sizes:
     # 数字标记方块尺寸
     MENU_BADGE_SIZE = 28
 
+    # 多列布局：每张卡片固定宽度，窗口总宽 = padding*2 + card_width*columns + gap*(columns-1)
+    MENU_CARD_WIDTH = 320
+    MENU_CARD_GAP = 8
+    MENU_HORIZONTAL_PADDING = 8
+
     BUTTON_HEIGHT = 36
     BUTTON_WIDTH = 80

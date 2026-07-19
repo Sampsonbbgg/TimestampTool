@@ -21,7 +21,8 @@ class ConfigManager:
         "settings": {
             "hotkey": "ctrl+shift+z",
             "theme": "light",
-            "autostart": False
+            "autostart": False,
+            "menu_columns": 1
         },
         "templates": [
             {"name": "日期_内容_署名", "format": "{YYYY}_{MM}_{DD}_##_Sampson"},
@@ -231,6 +232,27 @@ class ConfigManager:
         if 'settings' not in self.data:
             self.data['settings'] = {}
         self.data['settings']['autostart'] = bool(value)
+    
+    @property
+    def menu_columns(self) -> int:
+        """浮窗菜单每行显示的模板卡片数量（1/2/3）"""
+        v = self.data.get('settings', {}).get('menu_columns', 1)
+        try:
+            v = int(v)
+        except (ValueError, TypeError):
+            v = 1
+        return max(1, min(3, v))
+    
+    @menu_columns.setter
+    def menu_columns(self, value: int):
+        """设置浮窗菜单每行显示的卡片数量"""
+        if 'settings' not in self.data:
+            self.data['settings'] = {}
+        try:
+            v = int(value)
+        except (ValueError, TypeError):
+            v = 1
+        self.data['settings']['menu_columns'] = max(1, min(3, v))
     
     def reload(self):
         """重新加载配置"""

@@ -18,7 +18,18 @@
 
 ## [Unreleased]
 
-_（正在开发中的功能，发布前会分配版本号并移到下方）_
+### Added（新增）
+- **浮窗多列布局**：新配置项 `settings.menu_columns`（默认 1）支持每行 1/2/3 张模板卡片
+- 设置窗口"偏好设置"新增"浮窗每行显示"下拉选项 + **实时布局预告**（例：`共 5 个模板 → 3 行 × 2 列`）
+- 每张卡片固定 `MENU_CARD_WIDTH = 320`px，窗口总宽随列数线性增长，可读性一致
+
+### Changed（变更）
+- `_create_menu_item` 重构为 `_build_menu_item`：只创建卡片不 pack，由 caller 决定布局位置（为多列布局做基础）
+- `_compute_container_height` 参数从 `n_items` 改为 `n_rows`（多列场景下 rows ≠ items）
+- 设置窗口高度 580 → 620，容纳新增的一行控件
+
+### Fixed（修复）
+- **浮窗底部第二行提示被裁剪**：`_compute_container_height` 里 `hint_area` 从 55 加到 68（两行 SMALL 字体加上 pack pady 实测约 60），buffer 从 4 加到 10 冗余
 
 ---
 

@@ -84,18 +84,19 @@ class TimestampToolApp:
     
     def _show_popup_menu(self):
         """在主线程中显示弹出菜单"""
-        # 重新加载配置（获取最新模板）
+        # 重新加载配置（获取最新模板 + 列数偏好）
         self.config.reload()
 
         # 用 list copy 传给 popup_menu，避免引用共享导致数据回流
         templates_snapshot = list(self.config.templates)
 
-        # 创建弹出菜单（传入原窗口 HWND 用于失焦判断）
+        # 创建弹出菜单（传入原窗口 HWND 用于失焦判断 + 列数偏好）
         self.popup_menu = PopupMenu(
             master=self.root,
             templates=templates_snapshot,
             on_select_callback=self._on_template_selected,
             target_hwnd=self._original_hwnd,
+            columns=self.config.menu_columns,
         )
     
     def _on_template_selected(self, template):

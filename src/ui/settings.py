@@ -51,7 +51,7 @@ class SettingsWindow:
         """创建设置窗口"""
         self.window = ctk.CTkToplevel()
         self.window.title("TimestampTool 设置")
-        self.window.geometry("600x580")
+        self.window.geometry("620x620")
         self.window.resizable(False, False)
         self.window.configure(fg_color=Colors.BG_PRIMARY)
         self.window.attributes('-topmost', True)
@@ -174,7 +174,7 @@ class SettingsWindow:
         self._hotkey_entry.insert(0, self._hotkey)
 
     def _create_preference_section(self, parent):
-        """创建偏好设置区域（开机自启等）"""
+        """创建偏好设置区域（开机自启 + 浮窗列数等）"""
         section_frame = ctk.CTkFrame(
             parent, fg_color=Colors.BG_CARD,
             corner_radius=Sizes.CORNER_RADIUS_CARD,
@@ -182,27 +182,24 @@ class SettingsWindow:
         )
         section_frame.pack(fill="x", pady=(0, 12))
 
-        inner = ctk.CTkFrame(section_frame, fg_color="transparent")
-        inner.pack(fill="x", padx=16, pady=12)
+        # ==== 行 1: 标题 + 开机自启开关 ====
+        row1 = ctk.CTkFrame(section_frame, fg_color="transparent")
+        row1.pack(fill="x", padx=16, pady=(12, 4))
 
-        # 区域标题
         ctk.CTkLabel(
-            inner, text="偏好设置", font=Fonts.SUBTITLE,
+            row1, text="偏好设置", font=Fonts.SUBTITLE,
             text_color=Colors.TEXT_PRIMARY
         ).pack(side="left", padx=(0, 16))
 
-        # 说明文字
         ctk.CTkLabel(
-            inner, text="开机自动启动:", font=Fonts.BODY,
+            row1, text="开机自动启动:", font=Fonts.BODY,
             text_color=Colors.TEXT_SECONDARY
         ).pack(side="left", padx=(0, 8))
 
-        # 以注册表实际状态初始化开关，避免 config 与实际不一致
         actual_enabled = autostart.is_enabled()
         self._autostart_var = ctk.BooleanVar(value=actual_enabled)
-
         self._autostart_switch = ctk.CTkSwitch(
-            inner,
+            row1,
             text="",
             variable=self._autostart_var,
             command=self._on_autostart_toggle,
@@ -214,14 +211,85 @@ class SettingsWindow:
         )
         self._autostart_switch.pack(side="left", padx=(0, 8))
 
-        # 状态提示（右侧显示当前状态文字）
         self._autostart_status = ctk.CTkLabel(
-            inner,
+            row1,
             text=("已启用" if actual_enabled else "未启用"),
             font=Fonts.SMALL,
             text_color=(Colors.SUCCESS if actual_enabled else Colors.TEXT_HINT),
         )
         self._autostart_status.pack(side="left")
+
+        # ==== 行 2: 浮窗每行显示 N 个 + 布局预告 ====
+        row2 = ctk.CTkFrame(section_frame, fg_color="transparent")
+        row2.pack(fill="x", padx=16, pady=(4, 12))
+
+        # 缩进对齐（跟"开机自动启动"标签左侧起点保持一致）
+        ctk.CTkLabel(row2, text="", width=64).pack(side="left", padx=(0, 16))
+
+        ctk.CTkLabel(
+            row2, text="浮窗每行显示:", font=Fonts.BODY,
+            text_color=Colors.TEXT_SECONDARY
+        ).pack(side="left", padx=(0, 8))
+
+        current_cols = self.config.menu_columns
+        self._menu_columns_var = ctk.StringVar(value=str(current_cols))
+        self._menu_columns_option = ctk.CTkOptionMenu(
+            row2,
+            values=["1", "2", "3"],
+            variable=self._menu_columns_var,
+            command=self._on_menu_columns_change,
+            width=64, height=28,
+            font=Fonts.BODY,
+            fg_color=Colors.ACCENT,
+            button_color=Colors.ACCENT_HOVER,
+        )
+        self._menu_columns_option.pack(side="left", padx=(0, 8))
+
+        # 单位标签
+        ctk.CTkLabel(
+            row2, text="个/行", font=Fonts.SMALL,
+            text_color=Colors.TEXT_HINT
+        ).pack(side="left", padx=(0, 16))
+
+        # 布局预告文字（实时更新）
+        self._layout_preview_label = ctk.CTkLabel(
+            row2, text=self._get_layout_preview_text(current_cols),
+            font=Fonts.SMALL,
+            text_color=Colors.ACCENT,
+        )
+        self._layout_preview_label.pack(side="left")
+
+    def _get_layout_preview_text(self, columns: int) -> str:
+        """生成布局预告文字：'共 N 个模板 → M 行 × K 列'"""
+        n_templates = min(len(self._templates) if self._templates else 0, 9)
+        if n_templates == 0:
+            return "预告：暂无模板"
+        cols = max(1, min(3, int(columns)))
+        rows = (n_templates + cols - 1) // cols  # 向上取整
+        return f"预告：共 {n_templates} 个模板 → {rows} 行 × {cols} 列"
+
+    def _on_menu_columns_change(self, value: str):
+        """浮窗列数下拉切换回调"""
+        try:
+            new_cols = int(value)
+        except (ValueError, TypeError):
+            return
+
+        # 立即持久化
+        self.config.menu_columns = new_cols
+        try:
+            self.config.save()
+        except Exception:
+            pass
+
+        # 更新预告文字
+        if hasattr(self, '_layout_preview_label') and self._layout_preview_label:
+            try:
+                self._layout_preview_label.configure(
+                    text=self._get_layout_preview_text(new_cols)
+                )
+            except Exception:
+                pass
 
     def _on_autostart_toggle(self):
         """开机自启开关切换回调"""
@@ -305,6 +373,16 @@ class SettingsWindow:
         if hasattr(self, '_section_title_label') and self._section_title_label:
             try:
                 self._section_title_label.configure(text=self._get_section_title())
+            except Exception:
+                pass
+
+        # 同步更新布局预告（模板数变了，预告的 M 行也要重算）
+        if hasattr(self, '_layout_preview_label') and self._layout_preview_label:
+            try:
+                cur_cols = int(self._menu_columns_var.get()) if hasattr(self, '_menu_columns_var') else 1
+                self._layout_preview_label.configure(
+                    text=self._get_layout_preview_text(cur_cols)
+                )
             except Exception:
                 pass
 

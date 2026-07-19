@@ -28,17 +28,19 @@ from window_utils import (
 class PopupMenu:
     """浮窗模板选择菜单"""
 
-    def __init__(self, master, templates, on_select_callback, target_hwnd=0):
+    def __init__(self, master, templates, on_select_callback, target_hwnd=0, columns=1):
         """
         Args:
             master: tkinter 主窗口（隐藏的根窗口）
             templates: 模板列表 [{"name": "...", "format": "..."}, ...]
             on_select_callback: 选择回调 callback(template_dict)
             target_hwnd: 触发菜单前的前台窗口 HWND，用于失焦自动关闭判断
+            columns: 浮窗每行显示的卡片数量（1/2/3），窗口宽度按此计算
         """
         self.templates = templates
         self.on_select = on_select_callback
         self.target_hwnd = target_hwnd or get_foreground_hwnd()
+        self.columns = max(1, min(3, int(columns) if columns else 1))
         self.window = None
         self._item_frames = []
         self._hotkey_grabber = None
@@ -58,24 +60,29 @@ class PopupMenu:
         self.window.update_idletasks()
         make_noactivate(self.window)
 
-        # ==== 动态计算容器高度 ====
-        # pack_propagate(False) 会锁死 width 和 height 两个维度，
-        # 若不按实际模板数计算高度，会导致第 5+ 个模板被裁掉。
+        # ==== 多列布局：计算行数、卡片宽度、容器尺寸 ====
         n_items = min(len(self.templates), 9)
-        container_h = self._compute_container_height(n_items)
+        cols = self.columns
+        n_rows = (n_items + cols - 1) // cols  # 向上取整
+        card_w = Sizes.MENU_CARD_WIDTH
+        gap = Sizes.MENU_CARD_GAP
+        hpad = Sizes.MENU_HORIZONTAL_PADDING
+        # 容器宽度 = 两侧留白 + N 张卡片宽度 + (N-1) 个卡片间隙
+        container_w = hpad * 2 + card_w * cols + gap * (cols - 1)
+        container_h = self._compute_container_height(n_rows)
 
-        # 主容器（带圆角效果 + 固定宽高）
+        # 主容器（固定宽高，让内部按精确布局展开）
         container = ctk.CTkFrame(
             self.window,
             fg_color=Colors.BG_CARD,
             corner_radius=Sizes.CORNER_RADIUS_MENU,
             border_width=1,
             border_color=Colors.BORDER,
-            width=Sizes.MENU_MAX_WIDTH,
+            width=container_w,
             height=container_h,
         )
         container.pack(fill="both", expand=True, padx=2, pady=2)
-        container.pack_propagate(False)  # 固定宽高，让内部按容器尺寸铺开
+        container.pack_propagate(False)
 
         # 标题
         title = ctk.CTkLabel(
@@ -90,15 +97,27 @@ class PopupMenu:
         sep = ctk.CTkFrame(container, height=1, fg_color=Colors.BORDER)
         sep.pack(fill="x", padx=16, pady=(0, 6))
 
-        # 模板列表项（最多9个，对应数字键1-9）
-        for idx, tmpl in enumerate(self.templates[:9]):
-            preview = TemplateEngine.format_template(tmpl['format'])
-            self._create_menu_item(container, idx + 1, tmpl['name'], preview, tmpl)
+        # ==== 模板卡片：按行分组、每行内横向排布 ====
+        for row_idx in range(n_rows):
+            row_frame = ctk.CTkFrame(container, fg_color="transparent")
+            row_frame.pack(fill="x", padx=hpad, pady=1)
+            for col_idx in range(cols):
+                item_idx = row_idx * cols + col_idx
+                if item_idx >= n_items:
+                    break
+                tmpl = self.templates[item_idx]
+                preview = TemplateEngine.format_template(tmpl['format'])
+                item = self._build_menu_item(
+                    row_frame, item_idx + 1, tmpl['name'], preview, tmpl
+                )
+                # 各卡片间用 gap 分隔（第一张卡片左边不加）
+                left_pad = gap if col_idx > 0 else 0
+                item.pack(side="left", padx=(left_pad, 0))
 
         # 底部提示（含操作说明和数量信息）
         n = len(self.templates)
         hint_frame = ctk.CTkFrame(container, fg_color="transparent")
-        hint_frame.pack(pady=(8, 12))
+        hint_frame.pack(pady=(8, 14), fill="x")
 
         # 第一行：操作提示
         ctk.CTkLabel(
@@ -108,49 +127,48 @@ class PopupMenu:
             text_color=Colors.TEXT_HINT,
         ).pack()
 
-        # 第二行：功能说明（用户觉得设计好的提醒小文字）
+        # 第二行：功能说明（数量 + 粘贴机制）
         ctk.CTkLabel(
             hint_frame,
             text=f"共 {n} 个模板  ·  选中后自动粘贴，## 处会被选中供输入",
             font=Fonts.SMALL,
             text_color=Colors.TEXT_HINT,
-        ).pack(pady=(2, 0))
+        ).pack(pady=(3, 0))
 
-        # 直接使用计算好的容器高度（避免依赖 winfo_reqheight，
-        # 因为 pack_propagate=False 下 reqheight 是锁死的容器高度而不是内容真实高度）
+        # 直接使用计算好的容器高度（避免依赖 winfo_reqheight）
         target_h = container_h + 4  # +4 是 container 外围的 pady*2
-        self.window.geometry(f"{Sizes.MENU_MAX_WIDTH + 6}x{target_h}")
+        target_w = container_w + 6  # +6 是 container 外围 padx*2 + border 补偿
+        self.window.geometry(f"{target_w}x{target_h}")
 
         # 定位到鼠标位置
         self._position_at_mouse()
 
         # ==== 关键：启动全局按键独占（1-9 / ESC）====
-        # 这里不再用 tkinter bind，因为窗口不激活时收不到按键
         self._hotkey_grabber = MenuHotkeyGrabber(
             on_number=lambda i: self._schedule(lambda: self._select_by_index(i)),
             on_escape=lambda: self._schedule(self.close),
         )
         self._hotkey_grabber.start()
 
-        # 定时检查前台窗口是否被切走（用户切到别的 App 就自动关菜单）
+        # 定时检查前台窗口是否被切走
         self._focus_check_after_id = self.window.after(400, self._check_foreground)
 
-    def _compute_container_height(self, n_items: int) -> int:
-        """根据模板数量精确计算 container 高度
+    def _compute_container_height(self, n_rows: int) -> int:
+        """根据行数精确计算 container 高度
 
         高度组成（与 _create_window 里的 pack padding 严格对应）：
-        - title 区: pady(14+10) + Fonts.SUBTITLE 字号高度 ≈ 46
+        - title 区: pady(14+10) + SUBTITLE 字号 ≈ 46
         - separator: 1 + pady(6) = 7
-        - items: n_items * (MENU_ITEM_HEIGHT + pady*2 = 58+2 = 60)
-        - hint_frame: pady(8+12) + 两行 SMALL 字号 + gap(2) ≈ 55
-        - buffer: 4（防止边界渲染裁剪）
+        - rows: n_rows * (MENU_ITEM_HEIGHT + pady*2 = 58+2 = 60)
+        - hint_frame: pady(8+14) + 两行 SMALL + gap(3) ≈ 68
+        - buffer: 10（防止边界渲染裁剪）
         """
         title_area = 46
         separator_area = 7
-        items_area = n_items * (Sizes.MENU_ITEM_HEIGHT + 2)
-        hint_area = 55
-        buffer = 4
-        return title_area + separator_area + items_area + hint_area + buffer
+        rows_area = n_rows * (Sizes.MENU_ITEM_HEIGHT + 2)
+        hint_area = 68
+        buffer = 10
+        return title_area + separator_area + rows_area + hint_area + buffer
 
     def _schedule(self, fn):
         """从 hotkey 线程安全地调度到 tkinter 主线程"""
@@ -160,21 +178,27 @@ class PopupMenu:
             except Exception:
                 pass
 
-    def _create_menu_item(self, parent, number, name, preview, template):
-        """创建单个菜单项 - Fluent 双行卡片布局
+    def _build_menu_item(self, parent, number, name, preview, template):
+        """构建单个菜单项卡片 - Fluent 双行卡片布局
+
+        与 _create_menu_item 不同，此方法**只创建卡片但不 pack**，
+        由 caller 决定 pack 到哪里（支持多列布局中横向排列）。
 
         视觉层次：
         - 左侧：数字标记（蓝色圆角方块，突出可点击性）
         - 右侧上行：模板名（大字重字，主要信息）
         - 右侧下行：实时预览（等宽小字灰色，辅助信息）
+
+        Returns:
+            item_frame: 未 pack 的卡片框，caller 需自行 pack
         """
         item_frame = ctk.CTkFrame(
             parent,
             fg_color="transparent",
             corner_radius=Sizes.CORNER_RADIUS_CARD,
             height=Sizes.MENU_ITEM_HEIGHT,
+            width=Sizes.MENU_CARD_WIDTH,
         )
-        item_frame.pack(fill="x", padx=8, pady=1)
         item_frame.pack_propagate(False)
 
         # 左侧数字标记（更粗、更方正的 badge）
@@ -232,6 +256,7 @@ class PopupMenu:
             widget.bind('<Button-1>', on_click)
 
         self._item_frames.append(item_frame)
+        return item_frame
 
     def _position_at_mouse(self):
         """将窗口定位到鼠标位置，考虑屏幕边界"""
