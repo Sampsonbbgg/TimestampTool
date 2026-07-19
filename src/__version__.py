@@ -9,7 +9,7 @@ SemVer 语义化版本号（MAJOR.MINOR.PATCH）：
 - PATCH: bug 修复（例如浮窗第 5 个模板显示不全）
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __build_date__ = "2026-07-19"
 __author__ = "Sampson"
 
