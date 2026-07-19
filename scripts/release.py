@@ -312,7 +312,7 @@ def main() -> int:
 
     # ---- 完成提示 ----
     print()
-    print(f"{C.GREEN}{C.BOLD}✓ 发布完成！{C.END}")
+    print(f"{C.GREEN}{C.BOLD}[SUCCESS] 发布完成！{C.END}")
     print()
     print(f"下一步（推送到 GitHub）：")
     print(f"  {C.BOLD}git push && git push --tags{C.END}")
