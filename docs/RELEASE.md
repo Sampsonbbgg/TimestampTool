@@ -54,10 +54,28 @@ python scripts/release.py 1.5.2   # 直接指定版本号
 2. Bump `src/__version__.py` 的版本号和构建日期
 3. 打开 `CHANGELOG.md` 让你编辑本次变更（把 `[Unreleased]` 内容整理到新版本节）
 4. 执行 `python build.py` 打包
-5. 复制 `dist/TimestampTool.exe` 到 `releases/v{VERSION}/TimestampTool.exe`
+5. 复制 `dist/TimestampTool.exe` 到 `releases/v{VERSION}/`（**仅本地归档，不入库**）
 6. `git add . && git commit -m "chore: release v{VERSION}"`
 7. `git tag v{VERSION}`
-8. 提示你手动执行 `git push && git push --tags` 推送到 GitHub
+8. 提示你手动执行 `git push --tags` 推送到 GitHub
+
+## exe 的正确分发方式（重要）
+
+**exe 不入 git 库** ← 因为二进制大文件会让仓库快速膨胀（每版 60MB，10 版就 600MB）。
+
+**发布 exe 给用户的正确做法**：
+
+1. 一键脚本完成 + 推送 tag 后，访问 `https://github.com/<你的用户名>/TimestampTool/releases/new`
+2. **Tag**：从下拉选择刚推送的 tag（例如 `v1.1.0`）
+3. **Title**：`v1.1.0 - <一句话摘要>`
+4. **Description**：从 `CHANGELOG.md` 复制本版本章节
+5. **Attach binaries by dropping them here...**：把 `releases/v1.1.0/TimestampTool.exe` **拖入**
+6. 点击 **Publish release** → 用户可以从 GitHub Releases 页面直接下载
+
+好处：
+- **仓库瘦身**：git clone 快、diff 快
+- **专业分发**：用户在 GitHub 上看到规范的 Release 页
+- **无大小限制**：GitHub Releases 单个附件支持到 2GB（远超 exe 需要）
 
 ## 手动发布流程（不用脚本时的备份方案）
 

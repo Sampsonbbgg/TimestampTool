@@ -7,10 +7,12 @@ __pycache__/
 *.pyc
 
 # ============ 打包产物 ============
-# 每个 exe 版本归档到 releases/，dist/ 只是最新构建
+# 每个 exe 版本归档到 releases/，仅本地保留
+# 分发给用户 = 上传到 GitHub Releases 页面（不入 git 库，避免仓库膨胀）
 dist/
 build/
 build_temp/
+releases/
 *.spec
 
 # ============ 虚拟环境 ============
