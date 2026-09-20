@@ -22,7 +22,8 @@ class ConfigManager:
             "hotkey": "ctrl+shift+z",
             "theme": "light",
             "autostart": False,
-            "menu_columns": 1
+            "menu_columns": 1,
+            "animations": True
         },
         "templates": [
             {"name": "日期_内容_署名", "format": "{YYYY}_{MM}_{DD}_##_Sampson"},
@@ -218,8 +219,19 @@ class ConfigManager:
     
     @property
     def theme(self):
-        """获取主题设置"""
-        return self.data.get('settings', {}).get('theme', 'light')
+        """获取主题设置（light/dark/auto 三值，默认 light 保持兼容）"""
+        v = str(self.data.get('settings', {}).get('theme', 'light')).strip().lower()
+        return v if v in ("light", "dark", "auto") else "light"
+
+    @theme.setter
+    def theme(self, value):
+        """设置主题（仅记录，实际生效需调用 ctk.set_appearance_mode）"""
+        if 'settings' not in self.data:
+            self.data['settings'] = {}
+        v = str(value).strip().lower()
+        if v not in ("light", "dark", "auto"):
+            v = "light"
+        self.data['settings']['theme'] = v
     
     @property
     def autostart(self) -> bool:
@@ -253,6 +265,18 @@ class ConfigManager:
         except (ValueError, TypeError):
             v = 1
         self.data['settings']['menu_columns'] = max(1, min(3, v))
+
+    @property
+    def animations(self) -> bool:
+        """浮窗动效开关（淡入淡出/悬停渐变；关闭后动画帧数=1 直接终态，投影保留）"""
+        return bool(self.data.get('settings', {}).get('animations', True))
+
+    @animations.setter
+    def animations(self, value: bool):
+        """设置浮窗动效开关"""
+        if 'settings' not in self.data:
+            self.data['settings'] = {}
+        self.data['settings']['animations'] = bool(value)
     
     def reload(self):
         """重新加载配置"""

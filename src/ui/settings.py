@@ -12,6 +12,10 @@ import customtkinter as ctk
 from template_engine import TemplateEngine
 from paths import resource_path
 from ui.styles import Colors, Fonts, Sizes
+from ui.components import (
+    Card, PrimaryButton, SecondaryButton, DestructiveButton,
+    show_alert, placeholder_help_text, content_placeholder_note,
+)
 import autostart
 
 
@@ -92,11 +96,7 @@ class SettingsWindow:
     def _create_template_section(self, parent):
         """创建模板管理区域"""
         # 区域标题
-        section_frame = ctk.CTkFrame(
-            parent, fg_color=Colors.BG_CARD,
-            corner_radius=Sizes.CORNER_RADIUS_CARD,
-            border_width=1, border_color=Colors.BORDER
-        )
+        section_frame = Card(parent)
         section_frame.pack(fill="both", expand=True, pady=(0, 12))
 
         # 标题标签（含数量提示，实时反映当前模板数量）
@@ -119,37 +119,24 @@ class SettingsWindow:
         btn_frame = ctk.CTkFrame(section_frame, fg_color="transparent")
         btn_frame.pack(fill="x", padx=16, pady=(0, 12))
 
-        ctk.CTkButton(
-            btn_frame, text="+ 添加", width=80,
-            height=Sizes.BUTTON_HEIGHT,
-            corner_radius=Sizes.CORNER_RADIUS_BUTTON,
-            fg_color=Colors.ACCENT, hover_color=Colors.ACCENT_HOVER,
-            font=Fonts.BODY, command=self._on_add
+        PrimaryButton(
+            btn_frame, text="+ 添加", width=Sizes.BUTTON_WIDTH,
+            command=self._on_add
         ).pack(side="left", padx=(0, 8))
 
-        ctk.CTkButton(
-            btn_frame, text="✎ 编辑", width=80,
-            height=Sizes.BUTTON_HEIGHT,
-            corner_radius=Sizes.CORNER_RADIUS_BUTTON,
-            fg_color=Colors.ACCENT, hover_color=Colors.ACCENT_HOVER,
-            font=Fonts.BODY, command=self._on_edit
+        PrimaryButton(
+            btn_frame, text="✎ 编辑", width=Sizes.BUTTON_WIDTH,
+            command=self._on_edit
         ).pack(side="left", padx=(0, 8))
 
-        ctk.CTkButton(
-            btn_frame, text="🗑 删除", width=80,
-            height=Sizes.BUTTON_HEIGHT,
-            corner_radius=Sizes.CORNER_RADIUS_BUTTON,
-            fg_color=Colors.ERROR, hover_color="#B02A2D",
-            font=Fonts.BODY, command=self._on_delete
+        DestructiveButton(
+            btn_frame, text="🗑 删除", width=Sizes.BUTTON_WIDTH,
+            command=self._on_delete
         ).pack(side="left")
 
     def _create_hotkey_section(self, parent):
         """创建快捷键设置区域"""
-        section_frame = ctk.CTkFrame(
-            parent, fg_color=Colors.BG_CARD,
-            corner_radius=Sizes.CORNER_RADIUS_CARD,
-            border_width=1, border_color=Colors.BORDER
-        )
+        section_frame = Card(parent)
         section_frame.pack(fill="x", pady=(0, 12))
 
         inner = ctk.CTkFrame(section_frame, fg_color="transparent")
@@ -175,11 +162,7 @@ class SettingsWindow:
 
     def _create_preference_section(self, parent):
         """创建偏好设置区域（开机自启 + 浮窗列数等）"""
-        section_frame = ctk.CTkFrame(
-            parent, fg_color=Colors.BG_CARD,
-            corner_radius=Sizes.CORNER_RADIUS_CARD,
-            border_width=1, border_color=Colors.BORDER
-        )
+        section_frame = Card(parent)
         section_frame.pack(fill="x", pady=(0, 12))
 
         # ==== 行 1: 标题 + 开机自启开关 ====
@@ -205,8 +188,8 @@ class SettingsWindow:
             command=self._on_autostart_toggle,
             onvalue=True, offvalue=False,
             progress_color=Colors.ACCENT,
-            button_color="#FFFFFF",
-            button_hover_color="#F0F0F0",
+            button_color=Colors.SWITCH_BUTTON,
+            button_hover_color=Colors.SWITCH_BUTTON_HOVER,
             width=48,
         )
         self._autostart_switch.pack(side="left", padx=(0, 8))
@@ -221,7 +204,7 @@ class SettingsWindow:
 
         # ==== 行 2: 浮窗每行显示 N 个 + 布局预告 ====
         row2 = ctk.CTkFrame(section_frame, fg_color="transparent")
-        row2.pack(fill="x", padx=16, pady=(4, 12))
+        row2.pack(fill="x", padx=16, pady=(4, 4))
 
         # 缩进对齐（跟"开机自动启动"标签左侧起点保持一致）
         ctk.CTkLabel(row2, text="", width=64).pack(side="left", padx=(0, 16))
@@ -258,6 +241,57 @@ class SettingsWindow:
             text_color=Colors.ACCENT,
         )
         self._layout_preview_label.pack(side="left")
+
+        # ==== 行 3: 浮窗动效开关（淡入淡出/悬停渐变；投影不受影响） ====
+        row3 = ctk.CTkFrame(section_frame, fg_color="transparent")
+        row3.pack(fill="x", padx=16, pady=(4, 12))
+
+        # 缩进对齐（跟"开机自动启动"标签左侧起点保持一致）
+        ctk.CTkLabel(row3, text="", width=64).pack(side="left", padx=(0, 16))
+
+        ctk.CTkLabel(
+            row3, text="浮窗动效:", font=Fonts.BODY,
+            text_color=Colors.TEXT_SECONDARY
+        ).pack(side="left", padx=(0, 8))
+
+        animations_on = self.config.animations
+        self._animations_var = ctk.BooleanVar(value=animations_on)
+        self._animations_switch = ctk.CTkSwitch(
+            row3,
+            text="",
+            variable=self._animations_var,
+            command=self._on_animations_toggle,
+            onvalue=True, offvalue=False,
+            progress_color=Colors.ACCENT,
+            button_color=Colors.SWITCH_BUTTON,
+            button_hover_color=Colors.SWITCH_BUTTON_HOVER,
+            width=48,
+        )
+        self._animations_switch.pack(side="left", padx=(0, 8))
+
+        self._animations_status = ctk.CTkLabel(
+            row3,
+            text=("已开启" if animations_on else "已关闭（直接终态，保留投影）"),
+            font=Fonts.SMALL,
+            text_color=(Colors.SUCCESS if animations_on else Colors.TEXT_HINT),
+        )
+        self._animations_status.pack(side="left")
+
+    def _on_animations_toggle(self):
+        """浮窗动效开关切换回调（立即持久化，下次呼出浮窗生效）"""
+        desired = bool(self._animations_var.get())
+        self.config.animations = desired
+        try:
+            self.config.save()
+        except Exception:
+            pass
+        try:
+            self._animations_status.configure(
+                text=("已开启" if desired else "已关闭（直接终态，保留投影）"),
+                text_color=(Colors.SUCCESS if desired else Colors.TEXT_HINT),
+            )
+        except Exception:
+            pass
 
     def _get_layout_preview_text(self, columns: int) -> str:
         """生成布局预告文字：'共 N 个模板 → M 行 × K 列'"""
@@ -323,31 +357,20 @@ class SettingsWindow:
         btn_frame = ctk.CTkFrame(parent, fg_color="transparent")
         btn_frame.pack(fill="x")
 
-        # 左侧 - 重置默认
-        ctk.CTkButton(
+        # 左侧 - 重置默认（警告色，覆盖 Primary 默认配色）
+        PrimaryButton(
             btn_frame, text="重置默认", width=100,
-            height=Sizes.BUTTON_HEIGHT,
-            corner_radius=Sizes.CORNER_RADIUS_BUTTON,
-            fg_color=Colors.WARNING, hover_color="#E07800",
-            font=Fonts.BODY, command=self._on_reset
+            fg_color=Colors.WARNING, hover_color=Colors.WARNING_HOVER,
+            command=self._on_reset
         ).pack(side="left")
 
         # 右侧 - 保存 & 取消
-        ctk.CTkButton(
-            btn_frame, text="保存", width=92,
-            height=Sizes.BUTTON_HEIGHT,
-            corner_radius=Sizes.CORNER_RADIUS_BUTTON,
-            fg_color=Colors.ACCENT, hover_color=Colors.ACCENT_HOVER,
-            font=Fonts.BODY, command=self._on_save
+        PrimaryButton(
+            btn_frame, text="保存", command=self._on_save
         ).pack(side="right")
 
-        ctk.CTkButton(
-            btn_frame, text="取消", width=92,
-            height=Sizes.BUTTON_HEIGHT,
-            corner_radius=Sizes.CORNER_RADIUS_BUTTON,
-            fg_color=Colors.BG_HOVER, hover_color=Colors.BG_ACTIVE,
-            text_color=Colors.TEXT_PRIMARY,
-            font=Fonts.BODY, command=self._on_close
+        SecondaryButton(
+            btn_frame, text="取消", command=self._on_close
         ).pack(side="right", padx=(0, 8))
 
     # ===== 模板卡片渲染 =====
@@ -388,11 +411,7 @@ class SettingsWindow:
 
     def _create_card(self, idx, tmpl):
         """创建单个模板卡片"""
-        card = ctk.CTkFrame(
-            self._scroll_frame, fg_color=Colors.BG_CARD,
-            corner_radius=Sizes.CORNER_RADIUS_CARD,
-            border_width=1, border_color=Colors.BORDER, height=52
-        )
+        card = Card(self._scroll_frame, height=52)
         card.pack(fill="x", pady=3)
         card.pack_propagate(False)
 
@@ -413,7 +432,7 @@ class SettingsWindow:
         # 实时预览
         preview_text = TemplateEngine.preview_template(tmpl['format'])
         preview_label = ctk.CTkLabel(
-            card, text=preview_text, font=("Consolas", 10),
+            card, text=preview_text, font=Fonts.PREVIEW_SMALL,
             text_color=Colors.ACCENT, anchor="e"
         )
         preview_label.pack(side="right", padx=12, pady=8)
@@ -587,29 +606,9 @@ class SettingsWindow:
             self.window = None
 
     def _show_message(self, msg):
-        """显示简单提示消息"""
+        """显示简单提示消息（薄封装，统一走 components.show_alert）"""
         if self.window:
-            dialog = ctk.CTkToplevel(self.window)
-            dialog.title("提示")
-            dialog.geometry("280x120")
-            dialog.resizable(False, False)
-            dialog.transient(self.window)
-            dialog.grab_set()
-            dialog.configure(fg_color=Colors.BG_PRIMARY)
-            dialog.attributes('-topmost', True)
-
-            ctk.CTkLabel(
-                dialog, text=msg, font=Fonts.BODY,
-                text_color=Colors.TEXT_PRIMARY
-            ).pack(expand=True, pady=(20, 10))
-
-            ctk.CTkButton(
-                dialog, text="确定", width=80,
-                height=Sizes.BUTTON_HEIGHT,
-                corner_radius=Sizes.CORNER_RADIUS_BUTTON,
-                fg_color=Colors.ACCENT, hover_color=Colors.ACCENT_HOVER,
-                font=Fonts.BODY, command=dialog.destroy
-            ).pack(pady=(0, 16))
+            show_alert(self.window, msg)
 
 
 class EditTemplateDialog:
@@ -685,11 +684,7 @@ class EditTemplateDialog:
         self._format_entry.bind('<KeyRelease>', lambda e: self._refresh_preview())
 
         # 实时预览区域
-        preview_frame = ctk.CTkFrame(
-            main, fg_color=Colors.BG_CARD,
-            corner_radius=Sizes.CORNER_RADIUS_CARD,
-            border_width=1, border_color=Colors.BORDER
-        )
+        preview_frame = Card(main)
         preview_frame.pack(fill="x", pady=(0, 12))
 
         ctk.CTkLabel(
@@ -698,7 +693,7 @@ class EditTemplateDialog:
         ).pack(fill="x", padx=12, pady=(8, 2))
 
         self._preview_label = ctk.CTkLabel(
-            preview_frame, text="", font=("Consolas", 12),
+            preview_frame, text="", font=Fonts.PREVIEW_BIG,
             text_color=Colors.ACCENT, anchor="w"
         )
         self._preview_label.pack(fill="x", padx=12, pady=(0, 10))
@@ -706,24 +701,15 @@ class EditTemplateDialog:
         # 初始预览
         self._refresh_preview()
 
-        # 占位符说明
-        help_text = (
-            "{YYYY}年  {MM}月  {DD}日  "
-            "{hh}时  {mm}分  {ss}秒  ##内容"
-        )
+        # 占位符说明（单一来源：components.placeholder_help_text）
         ctk.CTkLabel(
-            main, text="可用占位符:", font=Fonts.SMALL,
-            text_color=Colors.TEXT_SECONDARY, anchor="w"
-        ).pack(fill="x", pady=(0, 2))
-
-        ctk.CTkLabel(
-            main, text=help_text, font=Fonts.SMALL,
-            text_color=Colors.TEXT_HINT, anchor="w"
+            main, text=placeholder_help_text(), font=Fonts.SMALL,
+            text_color=Colors.TEXT_HINT, anchor="w", justify="left"
         ).pack(fill="x", pady=(0, 4))
 
         ctk.CTkLabel(
             main,
-            text="提示: 用 ## 作为内容占位符（Windows 文件名场景兼容）",
+            text="提示: " + content_placeholder_note(),
             font=Fonts.SMALL,
             text_color=Colors.TEXT_HINT, anchor="w"
         ).pack(fill="x", pady=(0, 16))
@@ -732,21 +718,12 @@ class EditTemplateDialog:
         btn_frame = ctk.CTkFrame(main, fg_color="transparent")
         btn_frame.pack(fill="x")
 
-        ctk.CTkButton(
-            btn_frame, text="确定", width=92,
-            height=Sizes.BUTTON_HEIGHT,
-            corner_radius=Sizes.CORNER_RADIUS_BUTTON,
-            fg_color=Colors.ACCENT, hover_color=Colors.ACCENT_HOVER,
-            font=Fonts.BODY, command=self._on_confirm
+        PrimaryButton(
+            btn_frame, text="确定", command=self._on_confirm
         ).pack(side="right")
 
-        ctk.CTkButton(
-            btn_frame, text="取消", width=92,
-            height=Sizes.BUTTON_HEIGHT,
-            corner_radius=Sizes.CORNER_RADIUS_BUTTON,
-            fg_color=Colors.BG_HOVER, hover_color=Colors.BG_ACTIVE,
-            text_color=Colors.TEXT_PRIMARY,
-            font=Fonts.BODY, command=self._on_cancel
+        SecondaryButton(
+            btn_frame, text="取消", command=self._on_cancel
         ).pack(side="right", padx=(0, 8))
 
         # 启动定时刷新预览
@@ -807,29 +784,9 @@ class EditTemplateDialog:
             self._dialog = None
 
     def _show_error(self, msg):
-        """在对话框内显示错误提示"""
+        """显示错误提示（薄封装，统一走 components.show_alert）"""
         if self._dialog:
-            error_win = ctk.CTkToplevel(self._dialog)
-            error_win.title("错误")
-            error_win.geometry("250x100")
-            error_win.resizable(False, False)
-            error_win.transient(self._dialog)
-            error_win.grab_set()
-            error_win.configure(fg_color=Colors.BG_PRIMARY)
-            error_win.attributes('-topmost', True)
-
-            ctk.CTkLabel(
-                error_win, text=msg, font=Fonts.BODY,
-                text_color=Colors.ERROR
-            ).pack(expand=True, pady=(16, 8))
-
-            ctk.CTkButton(
-                error_win, text="确定", width=80,
-                height=Sizes.BUTTON_HEIGHT,
-                corner_radius=Sizes.CORNER_RADIUS_BUTTON,
-                fg_color=Colors.ACCENT, hover_color=Colors.ACCENT_HOVER,
-                font=Fonts.BODY, command=error_win.destroy
-            ).pack(pady=(0, 12))
+            show_alert(self._dialog, msg, title="错误", error=True)
 
 
 def show_about_dialog(master):
@@ -875,10 +832,6 @@ def show_about_dialog(master):
     ).pack(pady=(0, 16))
 
     # 关闭按钮
-    ctk.CTkButton(
-        dialog, text="确定", width=92,
-        height=Sizes.BUTTON_HEIGHT,
-        corner_radius=Sizes.CORNER_RADIUS_BUTTON,
-        fg_color=Colors.ACCENT, hover_color=Colors.ACCENT_HOVER,
-        font=Fonts.BODY, command=dialog.destroy
+    PrimaryButton(
+        dialog, text="确定", command=dialog.destroy
     ).pack()

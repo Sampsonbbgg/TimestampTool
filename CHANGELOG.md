@@ -22,6 +22,22 @@ _（正在开发中的功能，发布前会分配版本号并移到下方）_
 
 ---
 
+## [1.2.0] - 2026-09-20
+
+三轮 UI 系统改造（设计令牌 / 公共组件 / 浮窗动效）。
+
+### Added（新增）
+- **语义化明暗双主题令牌系统**（`styles.py`）：`Colors` 元组化（亮/暗双值）+ `Colors.resolve()` 统一解析，新增 `Spacing` / `Motion` / 扩展 `Fonts` 令牌；设置项 `theme` 真实生效（light/dark/system）
+- **公共组件抽取**（`src/ui/components.py`）：`Card` / `PrimaryButton` / `SecondaryButton` / `DestructiveButton` / `show_alert`，占位符提示文案收敛为单一来源
+- **浮窗动效**：真 alpha 淡入淡出、悬停颜色渐变、三层阴影垫窗、Windows DWM 原生圆角
+- 设置项 `animations`（偏好设置新增"浮窗动效"开关行）：关闭时动效整体降级为直接显示/隐藏
+
+### Changed（变更）
+- 设置窗口与浮窗全面改用组件库与主题令牌，消除散落的硬编码颜色/间距
+- `window_utils.py` 增加 DWM 圆角与阴影垫窗支持工具函数
+
+---
+
 ## [1.1.0] - 2026-07-19
 
 ### Added（新增）

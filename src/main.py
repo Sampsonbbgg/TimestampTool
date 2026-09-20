@@ -16,6 +16,7 @@ from clipboard import ClipboardInjector
 from tray import TrayManager
 from ui.popup_menu import PopupMenu
 from ui.settings import SettingsWindow, show_about_dialog
+from ui.styles import Motion
 from window_utils import get_foreground_hwnd
 from __version__ import version_short
 import autostart
@@ -29,6 +30,11 @@ class TimestampToolApp:
     def __init__(self):
         # 初始化配置
         self.config = ConfigManager()
+
+        # 应用主题设置（light/dark/auto → CustomTkinter appearance mode）
+        # 必须在创建任何 CTk 窗口之前设置，颜色令牌元组按此取值
+        theme = self.config.theme
+        ctk.set_appearance_mode("system" if theme == "auto" else theme)
         
         # 创建隐藏的根窗口（tkinter事件循环载体）
         self.root = ctk.CTk()
@@ -90,13 +96,14 @@ class TimestampToolApp:
         # 用 list copy 传给 popup_menu，避免引用共享导致数据回流
         templates_snapshot = list(self.config.templates)
 
-        # 创建弹出菜单（传入原窗口 HWND 用于失焦判断 + 列数偏好）
+        # 创建弹出菜单（传入原窗口 HWND 用于失焦判断 + 列数/动效偏好）
         self.popup_menu = PopupMenu(
             master=self.root,
             templates=templates_snapshot,
             on_select_callback=self._on_template_selected,
             target_hwnd=self._original_hwnd,
             columns=self.config.menu_columns,
+            animations=self.config.animations,
         )
     
     def _on_template_selected(self, template):
@@ -105,9 +112,12 @@ class TimestampToolApp:
         formatted_text = TemplateEngine.format_template(template['format'])
         target_hwnd = self._original_hwnd
         
-        # 短暂延迟后注入（确保菜单已关闭）
+        # 延迟注入：等菜单淡出动画（MENU_FADE_OUT_MS）走完再粘贴。
+        # inject_text 内部是阻塞式 sleep，若在淡出中途触发，事件循环被占，
+        # 菜单会卡在半透明帧上冻结 ~0.5s；先干净销毁再注入，视觉无残留。
         self.root.after(
-            50, lambda: self.clipboard.inject_text(formatted_text, target_hwnd)
+            Motion.MENU_FADE_OUT_MS + 40,
+            lambda: self.clipboard.inject_text(formatted_text, target_hwnd),
         )
     
     def _show_settings(self):
@@ -148,8 +158,7 @@ class TimestampToolApp:
 
 def main():
     """程序入口"""
-    # 设置CustomTkinter外观
-    ctk.set_appearance_mode("light")
+    # CustomTkinter 外观：主题在 TimestampToolApp.__init__ 中按配置设置
     ctk.set_default_color_theme("blue")
     
     # 创建并运行应用

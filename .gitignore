@@ -57,3 +57,4 @@ htmlcov/
 
 # ============ AI 工具缓存 ============
 .qoder/repowiki/
+.design-qa/

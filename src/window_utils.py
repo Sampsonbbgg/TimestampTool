@@ -10,20 +10,34 @@
 """
 import sys
 import threading
+import time
 import ctypes
 from ctypes import wintypes
 
 if sys.platform == 'win32':
     _user32 = ctypes.windll.user32
     _kernel32 = ctypes.windll.kernel32
+    _dwmapi = ctypes.windll.dwmapi
 else:
     _user32 = None
     _kernel32 = None
+    _dwmapi = None
 
 # ---- Windows API 常量 ----
 GWL_EXSTYLE = -20
 WS_EX_NOACTIVATE = 0x08000000
 WS_EX_TOOLWINDOW = 0x00000080
+
+# SetWindowPos 标志
+SWP_NOSIZE = 0x0001
+SWP_NOZORDER = 0x0004
+SWP_NOACTIVATE = 0x0010
+
+# DWM 窗口属性（Win11 圆角）——实测 overrideredirect 窗口上圆角生效、
+# 投影不生效（DWMWA_NCRENDERING_POLICY 强制后无阴影），故投影由
+# popup_menu 的逐层阴影窗实现，这里只借用 DWM 拿原生圆角。
+DWMWA_WINDOW_CORNER_PREFERENCE = 33
+DWMWCP_ROUND = 2  # 标准 ~8px 圆角
 
 WM_HOTKEY = 0x0312
 WM_QUIT = 0x0012
@@ -97,6 +111,52 @@ def get_tk_hwnd(tk_toplevel) -> int:
     return 0
 
 
+def apply_dwm_rounding(tk_toplevel, preference: int = DWMWCP_ROUND) -> bool:
+    """给窗口设置 Win11 DWM 圆角偏好（DWMWA_WINDOW_CORNER_PREFERENCE）。
+
+    实测：对 overrideredirect + WS_EX_NOACTIVATE 窗口生效，DWM 会把窗口
+    裁成原生圆角（约 8px），与 container 的 12px 圆角叠加后观感更柔和。
+    设置失败（非 Win11 / API 不可用）时静默返回 False，不影响窗口功能。
+    """
+    if _dwmapi is None:
+        return False
+    try:
+        tk_toplevel.update_idletasks()
+        hwnd = get_tk_hwnd(tk_toplevel)
+        if not hwnd:
+            return False
+        value = ctypes.c_int(preference)
+        hr = _dwmapi.DwmSetWindowAttribute(
+            hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
+            ctypes.byref(value), ctypes.sizeof(value),
+        )
+        return hr == 0
+    except Exception:
+        return False
+
+
+def set_window_pos(tk_toplevel, x: int, y: int, w: int, h: int) -> bool:
+    """用 Win32 SetWindowPos 原子地设定窗口尺寸+位置（不激活、不动层序）。
+
+    为什么阴影窗不走 Tk geometry：overrideredirect 窗在 map 过渡期间，
+    Tk 挂起的"位置请求"可能丢失（实测：合并串只应用尺寸、拆开的
+    位置调用也被忽略），而 SetWindowPos 在已 map 的窗口上始终生效。
+    SWP_NOACTIVATE 保持不抢焦点，SWP_NOZORDER 保持既有叠放次序。
+    """
+    if _user32 is None:
+        return False
+    try:
+        hwnd = get_tk_hwnd(tk_toplevel)
+        if not hwnd:
+            return False
+        return bool(_user32.SetWindowPos(
+            hwnd, 0, int(x), int(y), int(w), int(h),
+            SWP_NOZORDER | SWP_NOACTIVATE,
+        ))
+    except Exception:
+        return False
+
+
 # ============ 菜单期间独占 1-9 / ESC 全局按键 ============
 
 class MenuHotkeyGrabber:
@@ -139,13 +199,9 @@ class MenuHotkeyGrabber:
             self._tid = _kernel32.GetCurrentThreadId()
             # 注册 1-9（主键盘 & 小键盘）
             for i in range(9):
-                _user32.RegisterHotKey(
-                    None, self._ID_NUM_BASE + i, 0, VK_1 + i
-                )
-                _user32.RegisterHotKey(
-                    None, self._ID_NUMPAD_BASE + i, 0, VK_NUMPAD1 + i
-                )
-            _user32.RegisterHotKey(None, self._ID_ESCAPE, 0, VK_ESCAPE)
+                self._register_with_retry(self._ID_NUM_BASE + i, VK_1 + i)
+                self._register_with_retry(self._ID_NUMPAD_BASE + i, VK_NUMPAD1 + i)
+            self._register_with_retry(self._ID_ESCAPE, VK_ESCAPE)
 
             msg = wintypes.MSG()
             while not self._stopped.is_set():
@@ -171,6 +227,24 @@ class MenuHotkeyGrabber:
             func(*args)
         except Exception:
             pass
+
+    @staticmethod
+    def _register_with_retry(hk_id, vk, attempts=5, delay=0.03):
+        """RegisterHotKey 带短暂重试。
+
+        菜单淡出动画期间 close() 已 stop() 旧 grabber，但旧线程的
+        UnregisterHotKey 是异步完成的；若用户在 80ms 淡出内再次呼出
+        菜单，新 grabber 可能撞上"热键尚未被旧线程注销"而注册失败。
+        重试 5×30ms（≈150ms）足以覆盖该窗口期，且不影响正常路径。
+        """
+        for i in range(attempts):
+            try:
+                if _user32.RegisterHotKey(None, hk_id, 0, vk):
+                    return True
+            except Exception:
+                return False
+            time.sleep(delay)
+        return False
 
     def _unregister_all(self):
         if _user32 is None:
